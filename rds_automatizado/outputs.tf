@@ -13,5 +13,3 @@ output "db_instance_arn" {
 output "db_instance_status" {
   value = module.rds.db_instance_status
 }
-
-

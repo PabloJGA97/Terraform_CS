@@ -14,7 +14,7 @@ data "aws_subnets" "default_subnets" {
   }
 }
 
-# Crear RDS con el módulo de la comunidad 
+# Crear RDS con el módulo de la comunidad
 module "rds" {
   source  = "terraform-aws-modules/rds/aws"
   version = "6.1.0"
@@ -24,7 +24,7 @@ module "rds" {
   instance_class    = "db.t3.micro"
   allocated_storage = 20
 
-  # el modulo habilita por defecto que la contraseña y usuario sean generados por AWS Secret Manager, para deshabilitarlo escribe manager_master_user_password = false
+  # el modulo habilita por defecto que la contraseña y usuario sean geneadors por AWS Secret Manager, para deshabilitarlo
   manage_master_user_password = false
   db_name                     = var.db_name
   username                    = var.db_username
@@ -42,7 +42,6 @@ module "rds" {
 }
 
 # Crear Security Group para RDS
-# quizá añadir una outbound rule para que pueda enviar info, ya que ahora la base de datos solo puede ser consultada
 resource "aws_security_group" "rds_sg" {
   name_prefix = "rds-sg"
   description = "Permitir acceso MySQL desde la EC2"
@@ -58,7 +57,6 @@ resource "aws_security_group" "rds_sg" {
 
 # Crear Security Group para EC2
 resource "aws_security_group" "ec2_sg" {
-  # antes me ha saltado un error de incompatibilidad de caracteres ASCII2. Solo he quitado la tilde de "tráfico" y listo. La programación está pensada sobretodo en inglés y no suele esperar caracteres con tildes o 'ñ', así que es mejor evitarlos ya que el intérprete puede dar errores
   name_prefix = "ec2-sg"
   description = "Permitir trafico HTTP y SSH"
   vpc_id      = data.aws_vpc.default_vpc.id
@@ -77,7 +75,7 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # aqui falta una regla de outbound para que la instancia tenga salida a internet y pueda actualizar y descargar programas con los comandos del user-data
+  # aqui falta una regla de output para que la instancia tuviera salida a internet y pudiera actualizar y descargar programas del user-data
   egress {
     from_port   = 0
     to_port     = 0
@@ -100,12 +98,6 @@ module "ec2" {
   subnet_id                   = data.aws_subnets.default_subnets.ids[0]
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
 
-  # usamos el template en un archivo.sh, como lo tenemos dentro de un directorio, pues ponemos la ruta
-  # el valor de la variable la cogemos del output del modulo, que podemos encontrar en la documentacion del modulo en el terraform-registry.com
-  # función split porque el output de terraform nos devuelve el endpoint con ":3306" al final y eso el wp-config ni el mysql no lo interpretan como un endpoint 
-  # Además el root de la ruta no es la del sistema sino el de la carpeta de Terraform donde hacemos init, así que si los scripts de user-data están en la misma carpeta que el main.tf, pues solo indicamos el nombre del archivo       
-  user_data  = templatefile("./templates/publica.sh", { rds_endpoint = module.rds.db_instance_endpoint })
-
-  # esperará a que se cree el RDS para empezar a crearse el EC2
+  user_data  = templatefile("./templates/publica.sh", { rds_endpoint = split(":", module.rds.db_instance_endpoint)[0] })
   depends_on = [module.rds]
 }
